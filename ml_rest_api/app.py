@@ -13,8 +13,8 @@ from ml_rest_api.api.restx import blueprint
 import ml_rest_api.api.health.liveness  # pylint: disable=unused-import
 import ml_rest_api.api.health.readiness  # pylint: disable=unused-import
 import ml_rest_api.api.model.predict  # pylint: disable=unused-import
-import ml_rest_api.api.segmentation.background_removal  # pylint: disable=unused-import`
-import ml_rest_api.api.model.background_removal_prediction  # pylint: disable=unused-import`
+import ml_rest_api.api.segmentation.background_removal  # pylint: disable=unused-import
+import ml_rest_api.api.model.background_removal_prediction  # pylint: disable=unused-import
 from flask_cors import CORS
 
 IN_UWSGI: bool = True
@@ -27,7 +27,7 @@ except ImportError:
 
 def configure_app(flask_app: Flask) -> None:
     """Configures the app."""
-    flask_settings_to_apply: List = [
+    flask_settings_to_apply: List[str] = [
         #'FLASK_SERVER_NAME',
         "SWAGGER_UI_DOC_EXPANSION",
         "RESTX_VALIDATE",
@@ -38,18 +38,21 @@ def configure_app(flask_app: Flask) -> None:
     ]
     for key in flask_settings_to_apply:
         flask_app.config[key] = get_value(key)
-    flask_app.config["SECRET_KEY"] = os.urandom(32)
+
+    # Use a stable SECRET_KEY from config or environment in production
+    flask_app.config["SECRET_KEY"] = get_value("SECRET_KEY") or os.urandom(32)
 
 
 def initialize_app(flask_app: Flask) -> None:
     """Initialises the app."""
     configure_app(flask_app)
     with warnings.catch_warnings():
-        # Temporarily suppressing a warning during registration of the Flask blueprint
+        # Temporarily suppress a warning during registration of the Flask blueprint
         warnings.filterwarnings(
             "ignore", message="The setup method", category=UserWarning
         )
         flask_app.register_blueprint(blueprint)
+
     if get_value("MULTITHREADED_INIT") and not IN_UWSGI:
         trained_model_wrapper.multithreaded_init()
     else:
@@ -70,14 +73,14 @@ def main() -> None:
 
 
 APP = Flask(__name__)
+
 logging.config.fileConfig(
     os.path.normpath(os.path.join(os.path.dirname(__file__), "../logging.conf"))
 )
 log: Logger = getLogger(__name__)
 
-# Enable CORS for specific origins
+# Enable CORS for specific origins only
 cors = CORS(APP, resources={r"/api/*": {"origins": ["https://www.dwaste.live", "https://dwaste.live"]}})
-
 
 initialize_app(APP)
 
@@ -85,6 +88,7 @@ initialize_app(APP)
 @APP.route('/')
 def root_redirect():
     return redirect('/api')
+
 
 if __name__ == "__main__":
     main()

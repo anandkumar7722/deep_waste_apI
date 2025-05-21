@@ -17,7 +17,8 @@ class HealthReadiness(Resource):
     )
     def get() -> FlaskApiReturnType:
         """
-        Returns readiness status
+        Returns readiness status.
         """
         _ready = trained_model_wrapper.ready()
-        return {"Ready": _ready}, 200 if _ready else 503
+        status_code = 200 if _ready else 503
+        return {"Ready": _ready}, status_code

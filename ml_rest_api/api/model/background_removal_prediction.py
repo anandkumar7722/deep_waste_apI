@@ -12,10 +12,21 @@ from ml_rest_api.ml_trained_model.ml_trained_model import full_path
 from ml_rest_api.ml_trained_model.wrapper import trained_model_wrapper
 from rembg import remove
 
-# Define the request parsers
+# Define the request parser for file uploads and classifiers list
 upload_parser = reqparse.RequestParser()
-upload_parser.add_argument('file', location='files', type=FileStorage, required=True)
-upload_parser.add_argument('classifiers', required=True, action='append', help="['battery', 'biological', 'cardboard', 'clothes', 'glass', 'metal', 'paper','plastic','shoes','trash']")
+upload_parser.add_argument(
+    'file',
+    location='files',
+    type=FileStorage,
+    required=True,
+    help="Image file to process"
+)
+upload_parser.add_argument(
+    'classifiers',
+    required=True,
+    action='append',
+    help="List of classifiers e.g. ['battery', 'biological', 'cardboard', 'clothes', 'glass', 'metal', 'paper','plastic','shoes','trash']"
+)
 
 ns = api.namespace(
     "model",
@@ -46,33 +57,40 @@ class BackgroundRemovalPredict(Resource):
         if file.filename == '':
             return {'error': 'No selected file'}, 400
 
-        img_bytes = file.read()
-        input_image = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        try:
+            img_bytes = file.read()
+            input_image = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        except Exception as e:
+            return {'error': f'Failed to process image: {str(e)}'}, 400
 
-        # Use rembg to remove the background
+        # Remove background using rembg
         output_image = remove(input_image)
 
-        # Save the result image temporarily
+        # Save the result image temporarily in system temp directory
         result_file = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-        result_file.close()
+        try:
+            output_image.save(result_file.name, format="PNG")
+        finally:
+            result_file.close()
 
-        output_image.save(result_file.name, format="PNG")
-
-        # Ensure the correct filename with .png extension
+        # Construct download filename with PNG extension
         original_filename = file.filename
         base_filename = os.path.splitext(original_filename)[0]
         download_filename = f"bg_removed_{base_filename}.png"
 
-        # Save the processed image for prediction
+        # Save the processed image to a known path for prediction
         temp_file = full_path("temp/upload.png")
         output_image.save(temp_file, format="PNG")
 
-        # Perform prediction using the processed image
+        # Parse classifiers argument
         args = upload_parser.parse_args()
+
         model_dict: Dict = {
             "image": temp_file,
             "classifiers": args['classifiers']
         }
+
+        # Perform prediction
         prediction_result = trained_model_wrapper.run(model_dict)
 
         return jsonify({
@@ -90,6 +108,11 @@ class DownloadProcessedImage(Resource):
         """
         file_path = os.path.join(tempfile.gettempdir(), filename)
         if os.path.exists(file_path):
-            return send_file(file_path, mimetype='image/png', as_attachment=True, download_name=filename)
+            return send_file(
+                file_path,
+                mimetype='image/png',
+                as_attachment=True,
+                download_name=filename
+            )
         else:
             return {'error': 'File not found'}, 404

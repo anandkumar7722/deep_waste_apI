@@ -25,8 +25,10 @@ api = Api(  # pylint: disable=invalid-name
     blueprint,
     version="0.1",
     title="D.WASTE REST API",
-    description="A RESTful API to return predictions from a trained waste classification ML model, \
-          built with Python 3 and Flask-RESTX",
+    description=(
+        "A RESTful API to return predictions from a trained waste classification ML model, "
+        "built with Python 3 and Flask-RESTX"
+    ),
     format_checker=FormatChecker(
         formats=(
             "date-time",
@@ -48,9 +50,10 @@ def not_ready_error_handler() -> FlaskApiReturnType:
 @api.errorhandler
 def default_error_handler(exception) -> FlaskApiReturnType:
     """Default error handler that returns HTTP 500 error."""
-    log.exception(exception.message)
+    # Safely get exception message or fallback to string representation
+    error_msg = getattr(exception, "message", str(exception))
+    log.exception(error_msg)
     if get_value("FLASK_DEBUG"):
-        error_msg = exception.message
+        return {"message": error_msg}, 500
     else:
-        error_msg = "An unhandled exception occurred"
-    return {"message": error_msg}, 500
+        return {"message": "An unhandled exception occurred"}, 500

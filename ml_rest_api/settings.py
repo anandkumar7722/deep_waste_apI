@@ -1,11 +1,16 @@
 """Settings file."""
+
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
-def get_value(key: str) -> Any:
-    """Returns a value from the corresponding env var or from settings if env var doesn't exist."""
-    settings: Dict = {
+def get_value(key: str) -> Optional[Any]:
+    """
+    Returns a value from the corresponding environment variable,
+    or from settings if the environment variable doesn't exist.
+    Returns None if the key is not found in either.
+    """
+    settings: Dict[str, Any] = {
         # Flask settings
         "FLASK_SERVER_NAME": "localhost:8888",
         "FLASK_HOST": "0.0.0.0",
@@ -24,4 +29,4 @@ def get_value(key: str) -> Any:
         # Module settings
         "MULTITHREADED_INIT": True,
     }
-    return os.environ[key] if key in os.environ else settings.get(key, False)
+    return os.getenv(key, settings.get(key))
